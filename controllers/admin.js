@@ -8,6 +8,10 @@ const Subscription = require('../model/Subcription')
 const STRIPE_LIVE_KEY = process.env.STRIPE_LIVE_KEY
 const stripe = require('stripe')(STRIPE_LIVE_KEY);
 const mongoose = require('mongoose')
+const shortid = require('shortid');
+const bcrypt = require('bcrypt');
+const Consultant = require('../model/Consultant');
+
 
 
 module.exports.Analytics = async (req, res) => {
@@ -17,6 +21,8 @@ module.exports.Analytics = async (req, res) => {
                 res.status(403).json({ message: 'error', status: 403, meta: { response: 'Token is invalid or expired' } })
                 return
             }
+
+            // 
 
             const no_of_business = await User.count();
             const last_5_business = await User.find().sort({ _id: 1 }).limit(5).populate('subscription_status')
@@ -276,6 +282,32 @@ module.exports.AllBusiness = async (req, res) => {
 }
 
 
+module.exports.getOneAdmin = async (req, res) => {
+    try {
+        jwt.verify(req.token, process.env.SECRET, async (err, data) => {
+            if (err) {
+                res.status(403).json({ message: 'error', status: 403, meta: { response: 'Token is invalid or expired' } })
+                return
+            }
+
+            const user = await Admin.findById({ _id: req.params.id }).populate('consultants')
+            if (user) {
+                res.status(200).json({
+                    message: "success",
+                    status: 200,
+                    data: user
+                })
+            } else {
+                res.status(403).json({ message: 'error' })
+            }
+
+        })
+    } catch (e) {
+        return e
+    }
+}
+
+
 module.exports.oneSubscription = async (req, res) => {
     try {
         jwt.verify(req.token, process.env.SECRET, async (err, data) => {
@@ -313,7 +345,7 @@ module.exports.addConsultant = async (req, res) => {
             )
 
             await Business.findByIdAndUpdate(
-                { _id: req.params.id},
+                { _id: req.params.id },
                 { userConsultant: oneConsultant }
             )
 
@@ -410,8 +442,8 @@ module.exports.GetOneBusiness = async (req, res) => {
             const totalOverhead = Overheads + OverheadItems + OverheadItem_Transactions;
             const allTotal = totalMoneyIn + totalMoneyOut + totalOverhead;
 
-                console.log('total', DirectMaterials , DirectLabour  , OtherMoneyOut , RefundGiven)
-           
+            console.log('total', DirectMaterials, DirectLabour, OtherMoneyOut, RefundGiven)
+
             const alldata = {
                 money_in: {
                     DirectMaterials,
@@ -468,6 +500,86 @@ module.exports.deleteOneBusiness = async (req, res) => {
         console.log(e)
         res.status(403).json({ message: 'error', status: 403, meta: { response: "invalid id" } })
 
+    }
+}
+
+
+module.exports.createNewBusiness = async (req, res) => {
+    try {
+        jwt.verify(req.token, process.env.SECRET, async (err, data) => {
+            if (err) {
+                res.status(403).json({ message: 'error', status: 403, meta: { response: 'Token is invalid or expired' } })
+                return
+            }
+
+            const { consultant_id } = req.body;
+
+            const consultant = await Consultants.findById({ _id: consultant_id });
+
+            if (consultant) {
+                const {email, username, full_name} = req.body;
+                const newBusiness = await new Business({ ...req.body });
+                const newSubcription = new Subscription({
+                    type: 'trial',
+                    status: true,
+                })
+
+
+                const newBusiness_ = new Business_({
+                    currency: 'US Dollar',
+                    currencySymbol: '$'
+                })
+
+
+
+                await newBusiness_.save()
+
+                await newSubcription.save()
+
+                newBusiness.subscription_status = newSubcription;
+                newBusiness.business = newBusiness_;
+
+                await bcrypt.hash(req.body.password, 12).then(function (hash) {
+                    newBusiness.password = hash
+                });
+
+                const customer = await stripe.customers.create({
+                    email: email ? email : null,
+                    phone: username,
+                    name: full_name
+                });
+
+                newBusiness.stripeCustomerID = customer.id;
+
+                await newBusiness.save();
+
+                const oneConsultant = await Consultants.findByIdAndUpdate(
+                    { _id: consultant_id },
+                    {
+                        $push:
+                            { business: newBusiness }
+                    }
+                )
+
+                await Business.findByIdAndUpdate(
+                    { _id: newBusiness._id },
+                    { userConsultant: oneConsultant }
+                )
+
+                res.status(200).json({ message: 'success', status: 200, data: 'created successfully', meta: {} })
+
+
+            } else {
+                return res.status(403).json({
+                    message: 'error',
+                    status: 403,
+                    meta: { response: 'invalid consultant id' }
+                })
+            }
+        })
+    } catch (e) {
+        console.log(e)
+        res.status(403).json({ message: 'error', status: 403, meta: { response: "invalid id" } })
     }
 }
 
@@ -568,9 +680,33 @@ module.exports.createConsultant = async (req, res) => {
                 return
             }
 
-            const newConsultant = new Consultants({ ...req.body });
-            await newConsultant.save();
-            res.status(200).json({ message: 'success', status: 200, data: 'consultant created successfully', meta: {} })
+            const admin = await Admin.findById({ _id: req.params.id });
+            if (admin) {
+                const consultantId = shortid.generate();
+                const newConsultant = new Consultants({ ...req.body, user_id: consultantId });
+
+                const type = admin.account_type;
+
+                if (type === 'Partner') {
+                    const newPartnerConsultant = await Admin.findByIdAndUpdate(
+                        { _id: req.params.id },
+                        {
+                            $push:
+                                { consultants: newConsultant }
+                        }
+                    )
+                }
+
+                await newConsultant.save();
+                return res.status(200).json({ message: 'success', status: 200, data: 'consultant created successfully', meta: {} })
+            } else {
+                res.status(403).json({
+                    message: 'error',
+                    status: 403,
+                    meta: { response: "user not found" }
+                })
+            }
+
 
 
         })
@@ -605,14 +741,14 @@ module.exports.GetOneConsultant = async (req, res) => {
             }
 
             const oneConsultant = await Consultants.findById({ _id: req.params.id })
-            .populate({
-                path: 'business',
-                populate: { path: "subscription_status" }
-            })
-            .populate({
-                path: 'business',
-                populate: { path: 'business' }
-            })
+                .populate({
+                    path: 'business',
+                    populate: { path: "subscription_status" }
+                })
+                .populate({
+                    path: 'business',
+                    populate: { path: 'business' }
+                })
             res.status(200).json({ message: 'success', status: 200, data: oneConsultant, meta: {} })
 
 
@@ -640,5 +776,46 @@ module.exports.addBusiness = async (req, res, next) => {
         })
     } catch (e) {
         console.log(e)
+    }
+}
+
+
+module.exports.allPartners = async (req, res) => {
+    try {
+        jwt.verify(req.token, process.env.SECRET, async (err, data) => {
+            if (err) {
+                res.status(403).json({ message: 'error', status: 403, meta: { response: 'Token is invalid or expired' } })
+                return
+            }
+
+            const partner = await Admin.find({ account_type: 'Partner' })
+            res.status(200).json({ message: 'success', status: 200, data: partner, meta: {} })
+        })
+
+    } catch (e) {
+        console.log(e)
+    }
+}
+
+
+
+module.exports.AllUsers = async (req, res) => {
+    try {
+        jwt.verify(req.token, process.env.SECRET, async (err, data) => {
+            if (err) {
+                res.status(403).json({ message: 'error', status: 403, meta: { response: 'Token is invalid or expired' } })
+                return
+            }
+
+            const users = await Business.find();
+            const partner = await Admin.find({account_type: "Partner"})
+            const consultants = await Consultants.find();
+
+            const allData = [...users, ...partner, ...consultants];
+
+            res.status(200).json({ message: 'success', status: 200, data: allData, meta: {} })
+        })
+    } catch (e){
+        return e
     }
 }

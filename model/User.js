@@ -20,6 +20,7 @@ const userSchema = new mongoose.Schema({
     photoUrl: String,
     dateJoined: {
         type: String,
+        defautt: new Date()
     },
     numbers: String,
     messages: [{
@@ -219,7 +220,7 @@ const userSchema = new mongoose.Schema({
 
     }],
 
-})
+}, { timestamps: true })
 
 userSchema.plugin(autoPopulate);
 

@@ -7,7 +7,7 @@ const consultantSchema = new mongoose.Schema(
         password: String,
         token: String,
         email: String,
-        consultant_id: String,
+        user_id: String,
         mobile_number: String,
         suspended: {
             type: Boolean,
