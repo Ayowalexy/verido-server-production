@@ -11,6 +11,7 @@ const mongoose = require('mongoose')
 const shortid = require('shortid');
 const bcrypt = require('bcrypt');
 const Consultant = require('../model/Consultant');
+const asyncHandler = require('express-async-handler')
 
 
 
@@ -25,7 +26,15 @@ module.exports.Analytics = async (req, res) => {
             // 
 
             const no_of_business = await User.count();
-            const last_5_business = await User.find().sort({ _id: 1 }).limit(5).populate('subscription_status')
+            const last_5_business = await User
+                .find()
+                .populate('subscription_status')
+                .populate('consultant')
+                .populate({
+                    path: 'consultant',
+                    populate: 'partner'
+                })
+                .limit(5)
             const no_of_consultants = await Consultants.count();
             const no_of_trials = await Subscription.find({ type: 'trial' }).count();
             const no_of_subscribed = await Subscription.find({ type: 'Subscribed' }).count();
@@ -36,6 +45,7 @@ module.exports.Analytics = async (req, res) => {
                 (previousValue, currentValue) => previousValue + currentValue.amount
                 , 0
             )
+            console.log('Last 5 business', last_5_business.length)
 
             const allBusiness = await Business.find()
                 .populate('assetItems')
@@ -271,7 +281,14 @@ module.exports.AllBusiness = async (req, res) => {
                 res.status(403).json({ message: 'error', status: 403, meta: { response: 'Token is invalid or expired' } })
                 return
             }
-            const allBusiness = await Business.find().populate('business').populate('subscription_status');
+            const allBusiness = await Business.find()
+                .populate('business')
+                .populate('subscription_status')
+                .populate('consultant')
+                .populate({
+                    path: 'consultant',
+                    populate: 'partner'
+                })
             res.status(200).json({ message: 'success', status: 200, data: allBusiness, meta: {} })
         })
 
@@ -360,7 +377,7 @@ module.exports.addConsultant = async (req, res) => {
 
 
 
-module.exports.GetOneBusiness = async (req, res) => {
+module.exports.GetOneBusiness = asyncHandler(async (req, res) => {
 
     try {
         jwt.verify(req.token, process.env.SECRET, async (err, data) => {
@@ -385,101 +402,106 @@ module.exports.GetOneBusiness = async (req, res) => {
                 .populate('business')
                 .populate('userConsultant')
 
-
-            const DirectMaterials = oneBusiness?.DirectMaterials?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
-                , 0
-            )
-
-            const DirectLabour = oneBusiness?.DirectLabour?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
-                , 0
-            )
-
-            const OtherMoneyOut = oneBusiness?.OtherMoneyOut?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
-                , 0
-            )
-
-            const RefundGiven = oneBusiness?.RefundGiven?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amount)
-                , 0
-            )
-
-            const OtherMoneyIns = oneBusiness?.OtherMoneyIns?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
-                , 0
-            )
-
-            const Sales = oneBusiness?.Sales?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
-                , 0
-            )
-
-            const RefundReceived = oneBusiness?.RefundReceived?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amount)
-                , 0
-            )
-
-            const Overheads = oneBusiness?.Overheads?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
-                , 0
-            )
-
-            const OverheadItems = oneBusiness?.OverheadItems?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.price)
-                , 0
-            )
-
-            const OverheadItem_Transactions = oneBusiness?.OverheadItem_Transactions?.reduce(
-                (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
-                , 0
-            )
+            if (oneBusiness) {
 
 
-            const totalMoneyIn = DirectMaterials + DirectLabour + OtherMoneyOut + RefundGiven;
-            const totalMoneyOut = OtherMoneyIns + Sales + RefundReceived;
-            const totalOverhead = Overheads + OverheadItems + OverheadItem_Transactions;
-            const allTotal = totalMoneyIn + totalMoneyOut + totalOverhead;
+                const DirectMaterials = oneBusiness?.DirectMaterials?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
+                    , 0
+                )
 
-            console.log('total', DirectMaterials, DirectLabour, OtherMoneyOut, RefundGiven)
+                const DirectLabour = oneBusiness?.DirectLabour?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
+                    , 0
+                )
 
-            const alldata = {
-                money_in: {
-                    DirectMaterials,
-                    DirectLabour,
-                    OtherMoneyOut,
-                    RefundGiven,
-                    totalMoneyIn,
-                    percent: Math.floor((totalMoneyIn / allTotal) * 100)
-                },
-                money_out: {
-                    OtherMoneyIns,
-                    Sales,
-                    RefundReceived,
-                    totalMoneyOut,
-                    percent: Math.floor((totalMoneyOut / allTotal) * 100)
+                const OtherMoneyOut = oneBusiness?.OtherMoneyOut?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
+                    , 0
+                )
 
-                },
-                overhead: {
-                    Overheads,
-                    OverheadItems,
-                    OverheadItem_Transactions,
-                    totalOverhead,
-                    percent: Math.floor((totalOverhead / allTotal) * 100)
+                const RefundGiven = oneBusiness?.RefundGiven?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amount)
+                    , 0
+                )
 
-                },
+                const OtherMoneyIns = oneBusiness?.OtherMoneyIns?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
+                    , 0
+                )
 
+                const Sales = oneBusiness?.Sales?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
+                    , 0
+                )
+
+                const RefundReceived = oneBusiness?.RefundReceived?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amount)
+                    , 0
+                )
+
+                const Overheads = oneBusiness?.Overheads?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
+                    , 0
+                )
+
+                const OverheadItems = oneBusiness?.OverheadItems?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.price)
+                    , 0
+                )
+
+                const OverheadItem_Transactions = oneBusiness?.OverheadItem_Transactions?.reduce(
+                    (previousValue, currentValue) => Number(previousValue) + Number(currentValue.amountPaid)
+                    , 0
+                )
+
+
+                const totalMoneyIn = DirectMaterials + DirectLabour + OtherMoneyOut + RefundGiven;
+                const totalMoneyOut = OtherMoneyIns + Sales + RefundReceived;
+                const totalOverhead = Overheads + OverheadItems + OverheadItem_Transactions;
+                const allTotal = totalMoneyIn + totalMoneyOut + totalOverhead;
+
+                console.log('total', DirectMaterials, DirectLabour, OtherMoneyOut, RefundGiven)
+
+                const alldata = {
+                    money_in: {
+                        DirectMaterials,
+                        DirectLabour,
+                        OtherMoneyOut,
+                        RefundGiven,
+                        totalMoneyIn,
+                        percent: Math.floor((totalMoneyIn / allTotal) * 100)
+                    },
+                    money_out: {
+                        OtherMoneyIns,
+                        Sales,
+                        RefundReceived,
+                        totalMoneyOut,
+                        percent: Math.floor((totalMoneyOut / allTotal) * 100)
+
+                    },
+                    overhead: {
+                        Overheads,
+                        OverheadItems,
+                        OverheadItem_Transactions,
+                        totalOverhead,
+                        percent: Math.floor((totalOverhead / allTotal) * 100)
+
+                    },
+
+
+                }
+
+                res.status(200).json({ message: 'success', status: 200, data: { alldata, oneBusiness }, meta: {} })
+            } else {
+                res.status(403).json({ message: 'error', status: 403, meta: { response: 'Not found' } })
 
             }
-
-            res.status(200).json({ message: 'success', status: 200, data: { alldata, oneBusiness }, meta: {} })
-
         })
     } catch (e) {
         console.log(e)
     }
-}
+})
 
 
 module.exports.deleteOneBusiness = async (req, res) => {
@@ -517,7 +539,7 @@ module.exports.createNewBusiness = async (req, res) => {
             const consultant = await Consultants.findById({ _id: consultant_id });
 
             if (consultant) {
-                const {email, username, full_name} = req.body;
+                const { email, username, full_name } = req.body;
                 const newBusiness = await new Business({ ...req.body });
                 const newSubcription = new Subscription({
                     type: 'trial',
@@ -723,7 +745,7 @@ module.exports.AllConsultants = async (req, res) => {
                 return
             }
 
-            const allConsultants = await Consultants.find()
+            const allConsultants = await Consultants.find().populate('partner')
             res.status(200).json({ message: 'success', status: 200, data: allConsultants, meta: {} })
         })
     } catch (e) {
@@ -732,7 +754,7 @@ module.exports.AllConsultants = async (req, res) => {
 }
 
 
-module.exports.GetOneConsultant = async (req, res) => {
+module.exports.GetOneConsultant = asyncHandler(async (req, res) => {
     try {
         jwt.verify(req.token, process.env.SECRET, async (err, data) => {
             if (err) {
@@ -749,6 +771,7 @@ module.exports.GetOneConsultant = async (req, res) => {
                     path: 'business',
                     populate: { path: 'business' }
                 })
+                .populate('partner')
             res.status(200).json({ message: 'success', status: 200, data: oneConsultant, meta: {} })
 
 
@@ -757,7 +780,7 @@ module.exports.GetOneConsultant = async (req, res) => {
         console.log(e)
     }
 }
-
+)
 module.exports.addBusiness = async (req, res, next) => {
     try {
         jwt.verify(req.token, process.env.SECRET, async (err, data) => {
@@ -808,14 +831,14 @@ module.exports.AllUsers = async (req, res) => {
             }
 
             const users = await Business.find();
-            const partner = await Admin.find({account_type: "Partner"})
+            const partner = await Admin.find({ account_type: "Partner" })
             const consultants = await Consultants.find();
 
             const allData = [...users, ...partner, ...consultants];
 
             res.status(200).json({ message: 'success', status: 200, data: allData, meta: {} })
         })
-    } catch (e){
+    } catch (e) {
         return e
     }
 }

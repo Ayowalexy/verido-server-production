@@ -28,7 +28,11 @@ const consultantSchema = new mongoose.Schema(
         messages: [{
             type: mongoose.Schema.Types.ObjectId,
             ref: 'Messages'
-        }]
+        }],
+        partner: {
+            type: mongoose.Schema.Types.ObjectId,
+            ref: 'Admin'
+        }
     },
     {
         timestamps: true

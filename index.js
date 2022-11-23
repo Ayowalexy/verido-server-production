@@ -9,6 +9,7 @@ const AdminRoutes = require('./routes/admin');
 const AdminAuth = require('./routes/admin_auth')
 const cors = require('cors');
 const log = require('morgan');
+const { notFound, errorHandler } = require('./errorhandler')
 
 const PASSWORD = process.env.PASSWORD;
 const DATABASE = process.env.DATABASE
@@ -38,6 +39,9 @@ app.use(log('dev'));
 app.use(AuthRoutes);
 app.use(AdminRoutes);
 app.use('/admin', AdminAuth);
+
+app.use(notFound)
+app.use(errorHandler)
 
 
 

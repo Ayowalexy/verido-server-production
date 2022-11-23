@@ -169,13 +169,13 @@ module.exports.ConsultantAnalytics = async (req, res) => {
                         path: 'assetItems',
                     }
                 })
-        
-               
+
+
 
             if (consultant) {
                 let consultantBusiness = consultant.business
 
-                
+
 
                 const no_of_business = consultantBusiness.length;
                 const last_5_business = consultantBusiness;
@@ -395,19 +395,21 @@ module.exports.ConsultantBusiness = async (req, res) => {
             }
 
             const consultant = await Consultants.findById({ _id: req.params.id })
-                                        .populate({
-                                            path: 'business',
-                                            populate: {
-                                                path: 'business'
-                                            }
-                                        })
-                                        .populate({
-                                            path: 'business',
-                                            populate: {
-                                                path: 'subscription_status'
-                                            }
-                                        })
-            if(consultant){
+                .populate({
+                    path: 'business',
+                    populate: {
+                        path: 'business'
+                    }
+                })
+                .populate({
+                    path: 'business',
+                    populate: {
+                        path: 'subscription_status'
+                    }
+                })
+                .populate('partner')
+                
+            if (consultant) {
                 const consultantBusiness = consultant.business;
                 res.status(200).json({ message: 'success', status: 200, data: consultantBusiness, meta: {} })
 
@@ -418,7 +420,37 @@ module.exports.ConsultantBusiness = async (req, res) => {
                 })
             }
         })
-    } catch (e){
+    } catch (e) {
+        return e
+    }
+}
+
+
+module.exports.assignPartner = async (req, res) => {
+    try {
+        jwt.verify(req.token, process.env.SECRET, async (err, data) => {
+            if (err) {
+                res.status(403).json({ message: 'error', status: 403, meta: { response: 'Token is invalid or expired' } })
+                return
+            }
+
+            const consultant = await Consultants.findById({ _id: req.params.id });
+
+            console.log('consultant', req.params.id, req.params.admin)
+
+            const partner = await Admin.findById({ _id: req.params.admin })
+            if (partner && consultant) {
+                consultant.partner = partner;
+                await consultant.save();
+                res.status(200).json({ message: 'success', status: 200, data: consultant, meta: {} })
+
+            } else {
+                res.json({
+                    message: 'consultant not found'
+                })
+            }
+        })
+    } catch (e) {
         return e
     }
 }
