@@ -11,7 +11,54 @@ const mongoose = require('mongoose')
 const shortid = require('shortid');
 const bcrypt = require('bcrypt');
 const Consultant = require('../model/Consultant');
-const asyncHandler = require('express-async-handler')
+const asyncHandler = require('express-async-handler');
+const Video = require('../model/Videos')
+const { videoSchema } = require('../utils/JoiSchema')
+
+module.exports.AddVidoe = asyncHandler(async (req, res) => {
+    const { error, value } = videoSchema.validate(req.body)
+
+    if (error) {
+        console.log(error)
+        return res
+            .status(401)
+            .json(
+                {
+                    status: "error",
+                    message: "invalid request",
+                    meta: {
+                        error: error.message
+                    }
+                })
+    }
+
+
+    const video = new Video({...value});
+    console.log(video)
+    await video.save();
+    const videos = await Video.find();
+
+    res
+        .status(200)
+        .json(
+            {
+                data: videos,
+                status: "success",
+                meta: {}
+            })
+})
+
+module.exports.getAllVidoes = asyncHandler( async ( req, res) => {
+    const vidoes = await Video.find();
+    res
+        .status(200)
+        .json(
+            {
+                data: vidoes,
+                status: "success",
+                meta: {}
+            })
+})
 
 
 

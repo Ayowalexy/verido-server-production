@@ -11,18 +11,31 @@ const assetItemsSchema = Joi.object({
     lifeCount: Joi
         .string()
         .required(),
-    lifePeriod: Joi 
+    lifePeriod: Joi
         .string()
         .required(),
     description: Joi
         .string()
         .required(),
-    safeDelete: Joi 
+    safeDelete: Joi
         .string()
         .required()
 
 })
 
+const videoSchema = Joi.object({
+    category: Joi
+        .string()
+        .required(),
+    vidoeID: Joi
+        .string()
+        .required(),
+    title: Joi
+        .string()
+        .required()
+})
+
 module.exports = {
-    assetItemsSchema
+    assetItemsSchema,
+    videoSchema
 }

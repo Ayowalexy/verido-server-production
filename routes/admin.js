@@ -53,6 +53,10 @@ router.get('/consultant-business/:id', verifyToken, Consultant.ConsultantBusines
 router.get('/assign-partner/:id/:admin', verifyToken, Consultant.assignPartner)
 
 
+router.route('/video')
+        .post(verifyToken, Admin.AddVidoe)
+        .get(verifyToken, Admin.getAllVidoes)
+
 
 // create new business
 router.post('/create-business/:id', verifyToken, Admin.addBusiness);
